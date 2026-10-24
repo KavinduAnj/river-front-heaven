@@ -17,6 +17,9 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", require("./routes/auth"));
 // Later: users, reservations, guests, orders, billing ...
 
+app.use("/api", require("./routes/cabana")); // /api/cabana, /api/packages, /api/blocked-periods
+
+
 app.use((_req, res) => {
     res.status(404).json({ error: "Not found", code: "NOT_FOUND" });
 });
