@@ -38,4 +38,6 @@ app.use((err, _req, res, _next) => {
 
 app.use("/api/reservations", require("./routes/reservations"));
 
+app.use("/api", require("./routes/activities"));
+
 module.exports = app;
