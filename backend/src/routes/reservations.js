@@ -57,4 +57,33 @@ async function find(id) {
     return r;
 }
 
+// Is the cabana free? (Must come before "/:id", or "availability" would be read as an id.)
+const availabilityQuery = z.object({ from: date, to: date, excludeId: z.coerce.number().int().positive().optional() });
+router.get("/availability", staff, validate(availabilityQuery, "query"), asyncHandler(async (req, res) => {
+  const { from, to, excludeId } = req.query;
+  if (to <= from) throw new HttpError(400, "to must be after from", "INVALID_DATES");
+  const clash = await findClash(new Date(from), new Date(to), excludeId);
+  res.json({ available: !clash, conflictReference: clash?.reference ?? null });
+}));
+
+// List, with optional filters. The calendar uses it too: ?from=2026-11-01&to=2026-12-01
+const listQuery = z.object({
+  status: z.enum(["PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED", "NO_SHOW"]).optional(),
+  from: date.optional(),
+  to: date.optional(),
+});
+router.get("/", staff, validate(listQuery, "query"), asyncHandler(async (req, res) => {
+  const { status, from, to } = req.query;
+  const data = await prisma.reservation.findMany({
+    where: {
+      ...(status && { status }),
+      ...(from && { checkOutDate: { gt: new Date(from) } }), // stays that overlap from..to
+      ...(to && { checkInDate: { lt: new Date(to) } }),
+    },
+    ...show,
+    orderBy: { checkInDate: "desc" },
+  });
+  res.json({ data });
+}));
+
 module.exports = router;
