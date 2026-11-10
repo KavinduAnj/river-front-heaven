@@ -86,4 +86,31 @@ router.get("/", staff, validate(listQuery, "query"), asyncHandler(async (req, re
   res.json({ data });
 }));
 
+router.post("/", staff, validate(createSchema), asyncHandler(async (req, res) => {
+  const b = req.body;
+  if (!(await prisma.guest.findUnique({ where: { id: b.guestId } }))) throw new HttpError(404, "Guest not found", "NOT_FOUND");
+  if (b.checkInDate < new Date().toISOString().slice(0, 10)) throw new HttpError(400, "Check-in cannot be in the past", "INVALID_DATES");
+
+  const { pkg, cabana, from, to } = await check(b);
+  const reservation = await prisma.reservation.create({
+    data: {
+      reference: `RFH-${crypto.randomInt(100000, 1000000)}`,
+      guestId: b.guestId,
+      cabanaId: cabana.id,
+      packageId: pkg.id,
+      checkInDate: from,
+      checkOutDate: to,
+      adults: b.adults,
+      children: b.children,
+      nightlyRate: pkg.pricePerNight, // copied now, so later price changes do not alter this booking
+      source: b.source,
+      notes: b.notes,
+      createdById: req.user.id,
+    },
+    ...show,
+  });
+  res.status(201).json(reservation);
+}));
+
+
 module.exports = router;
