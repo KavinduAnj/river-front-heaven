@@ -57,4 +57,60 @@ async function find(id) {
     return r;
 }
 
+// Is the cabana free? (Must come before "/:id", or "availability" would be read as an id.)
+const availabilityQuery = z.object({ from: date, to: date, excludeId: z.coerce.number().int().positive().optional() });
+router.get("/availability", staff, validate(availabilityQuery, "query"), asyncHandler(async (req, res) => {
+  const { from, to, excludeId } = req.query;
+  if (to <= from) throw new HttpError(400, "to must be after from", "INVALID_DATES");
+  const clash = await findClash(new Date(from), new Date(to), excludeId);
+  res.json({ available: !clash, conflictReference: clash?.reference ?? null });
+}));
+
+// List, with optional filters. The calendar uses it too: ?from=2026-11-01&to=2026-12-01
+const listQuery = z.object({
+  status: z.enum(["PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED", "NO_SHOW"]).optional(),
+  from: date.optional(),
+  to: date.optional(),
+});
+router.get("/", staff, validate(listQuery, "query"), asyncHandler(async (req, res) => {
+  const { status, from, to } = req.query;
+  const data = await prisma.reservation.findMany({
+    where: {
+      ...(status && { status }),
+      ...(from && { checkOutDate: { gt: new Date(from) } }), // stays that overlap from..to
+      ...(to && { checkInDate: { lt: new Date(to) } }),
+    },
+    ...show,
+    orderBy: { checkInDate: "desc" },
+  });
+  res.json({ data });
+}));
+
+router.post("/", staff, validate(createSchema), asyncHandler(async (req, res) => {
+  const b = req.body;
+  if (!(await prisma.guest.findUnique({ where: { id: b.guestId } }))) throw new HttpError(404, "Guest not found", "NOT_FOUND");
+  if (b.checkInDate < new Date().toISOString().slice(0, 10)) throw new HttpError(400, "Check-in cannot be in the past", "INVALID_DATES");
+
+  const { pkg, cabana, from, to } = await check(b);
+  const reservation = await prisma.reservation.create({
+    data: {
+      reference: `RFH-${crypto.randomInt(100000, 1000000)}`,
+      guestId: b.guestId,
+      cabanaId: cabana.id,
+      packageId: pkg.id,
+      checkInDate: from,
+      checkOutDate: to,
+      adults: b.adults,
+      children: b.children,
+      nightlyRate: pkg.pricePerNight, // copied now, so later price changes do not alter this booking
+      source: b.source,
+      notes: b.notes,
+      createdById: req.user.id,
+    },
+    ...show,
+  });
+  res.status(201).json(reservation);
+}));
+
+
 module.exports = router;
