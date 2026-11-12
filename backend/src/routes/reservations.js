@@ -142,6 +142,17 @@ router.put("/:id", staff, validate(editSchema), asyncHandler(async (req, res) =>
     })
   );
 }));
+// Confirm, cancel or mark a no-show. MOVES lists which current statuses may move to the new one.
+const MOVES = { CONFIRMED: ["PENDING"], NO_SHOW: ["CONFIRMED"], CANCELLED: ["PENDING", "CONFIRMED"] };
+const statusSchema = z.object({ status: z.enum(Object.keys(MOVES)), reason: z.string().trim().optional() });
+router.patch("/:id/status", staff, validate(statusSchema), asyncHandler(async (req, res) => {
+  const { status, reason } = req.body;
+  const r = await find(parseId(req.params.id));
+  if (!MOVES[status].includes(r.status)) throw new HttpError(409, `A ${r.status.toLowerCase()} reservation cannot become ${status.toLowerCase()}`, "INVALID_STATUS");
+  if (status === "CANCELLED" && !reason) throw new HttpError(400, "A reason is required to cancel", "VALIDATION_ERROR");
+
+  res.json(await prisma.reservation.update({ where: { id: r.id }, data: { status, cancelReason: reason }, ...show }));
+}));
 
 
 module.exports = router;
