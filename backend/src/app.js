@@ -19,6 +19,7 @@ app.use("/api", require("./routes/cabana"));
 app.use("/api/reservations", require("./routes/reservations"));
 app.use("/api", require("./routes/activities"));
 app.use("/api", require("./routes/blockedPeriods"));
+app.use("/api/billing", require("./routes/billing"));
 
 // 404 handler — keep this after all API routes
 app.use((_req, res) => {
