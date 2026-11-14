@@ -48,27 +48,35 @@ function ReservationsContent() {
   const [selectedReservation, setSelectedReservation] = useState(null);
 
   // Attempt to fetch from backend API if available, fallback gracefully
-  useEffect(() => {
-    api("/packages")
-      .then((res) => {
-        if (res?.data && res.data.length > 0) {
-          setPackages(res.data);
-        }
-      })
-      .catch(() => {
-        // Fallback to local default packages
-      });
+// Fetch backend data only when using a real staff login.
+// Demo mode uses the local sample data.
+useEffect(() => {
+  const token = localStorage.getItem("rfh_token");
 
-    api("/reservations")
-      .then((res) => {
-        if (res?.data && res.data.length > 0) {
-          setReservations(res.data);
-        }
-      })
-      .catch(() => {
-        // Fallback to local default reservations
-      });
-  }, []);
+  if (!token || token === "demo_staff_token") {
+    return;
+  }
+
+  api("/packages")
+    .then((res) => {
+      if (res?.data && res.data.length > 0) {
+        setPackages(res.data);
+      }
+    })
+    .catch(() => {
+      // Keep local default packages
+    });
+
+  api("/reservations")
+    .then((res) => {
+      if (res?.data && res.data.length > 0) {
+        setReservations(res.data);
+      }
+    })
+    .catch(() => {
+      // Keep local default reservations
+    });
+}, []);
 
   // Handlers
   function handleNavigateMonth(direction) {
