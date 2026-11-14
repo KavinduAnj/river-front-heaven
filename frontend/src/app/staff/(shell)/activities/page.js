@@ -3,8 +3,13 @@
 
 import { useEffect, useState } from "react";
 import {
-    Plus, Search, Pencil, Activity as ActivityIcon,
-    Users, IndianRupee, RefreshCw
+    Plus,
+    Search,
+    Pencil,
+    Activity as ActivityIcon,
+    Users,
+    IndianRupee,
+    RefreshCw,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -23,7 +28,37 @@ const EMPTY_FORM = {
     isActive: true,
 };
 
-const CATEGORIES = ["All", "Safari", "Outdoor activity", "Package"];
+const CATEGORIES = ["All", "Safari", "Outdoor activity"];
+
+const DEMO_ACTIVITIES = [
+    {
+        id: "demo-1",
+        name: "Sunrise River Safari",
+        category: "Safari",
+        description: "Enjoy a peaceful early morning river safari and explore the surrounding wildlife.",
+        pricePerPerson: 5000,
+        maxParticipants: 8,
+        isActive: true,
+    },
+    {
+        id: "demo-2",
+        name: "Bird Watching",
+        category: "Outdoor activity",
+        description: "Discover local bird species during a guided nature experience.",
+        pricePerPerson: 2500,
+        maxParticipants: 6,
+        isActive: true,
+    },
+    {
+        id: "demo-3",
+        name: "Evening Boat Safari",
+        category: "Safari",
+        description: "Experience the river and its natural surroundings during the evening.",
+        pricePerPerson: 4000,
+        maxParticipants: 8,
+        isActive: false,
+    },
+];
 
 export default function ActivitiesPage() {
     const user = useStaff();
@@ -41,43 +76,72 @@ export default function ActivitiesPage() {
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState("");
 
+    const isDemoMode =
+        typeof window !== "undefined" &&
+        localStorage.getItem("rfh_token") === "demo_staff_token";
+
     async function loadActivities() {
-    try {
-        const result = await api("/activities");
-        setActivities(result.data || []);
+        setLoading(true);
         setError("");
-    } catch (err) {
-        setError(err.message || "Unable to load activities.");
-    } finally {
-        setLoading(false);
+
+        if (isDemoMode) {
+            setActivities(DEMO_ACTIVITIES);
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const result = await api("/activities");
+            setActivities(result.data || []);
+        } catch (err) {
+            setError(err.message || "Unable to load activities.");
+        } finally {
+            setLoading(false);
+        }
     }
-}
 
-   useEffect(() => {
-    let cancelled = false;
+    useEffect(() => {
+        let cancelled = false;
 
-    api("/activities")
-        .then((result) => {
-            if (!cancelled) {
-                setActivities(result.data || []);
-                setError("");
-            }
-        })
-        .catch((err) => {
-            if (!cancelled) {
-                setError(err.message || "Unable to load activities.");
-            }
-        })
-        .finally(() => {
-            if (!cancelled) {
+        async function fetchActivities() {
+            const token = localStorage.getItem("rfh_token");
+
+            if (token === "demo_staff_token") {
+                setActivities(DEMO_ACTIVITIES);
                 setLoading(false);
+                return;
             }
-        });
 
-    return () => {
-        cancelled = true;
-    };
-}, []);
+            if (!token) {
+                setError("Please sign in to view activities.");
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const result = await api("/activities");
+
+                if (!cancelled) {
+                    setActivities(result.data || []);
+                    setError("");
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err.message || "Unable to load activities.");
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        fetchActivities();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     function openAddDrawer() {
         setEditingId(null);
@@ -91,7 +155,7 @@ export default function ActivitiesPage() {
         setForm({
             name: activity.name,
             category: activity.category,
-            description: activity.description,
+            description: activity.description || "",
             pricePerPerson: String(activity.pricePerPerson),
             maxParticipants: String(activity.maxParticipants),
             isActive: activity.isActive,
@@ -112,6 +176,11 @@ export default function ActivitiesPage() {
     async function handleSubmit(event) {
         event.preventDefault();
         setFormError("");
+
+        if (isDemoMode) {
+            setFormError("Activity changes are unavailable in Demo Mode.");
+            return;
+        }
 
         const price = Number(form.pricePerPerson);
         const participants = Number(form.maxParticipants);
@@ -165,8 +234,9 @@ export default function ActivitiesPage() {
     }
 
     const filteredActivities = activities.filter((activity) => {
-        const matchesSearch =
-            activity.name.toLowerCase().includes(search.toLowerCase());
+        const matchesSearch = activity.name
+            .toLowerCase()
+            .includes(search.toLowerCase());
 
         const matchesCategory =
             category === "All" || activity.category === category;
@@ -178,18 +248,22 @@ export default function ActivitiesPage() {
 
     return (
         <div className="space-y-6">
-            {/* Page heading */}
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-ink">
                         Activities and Safaris
                     </h1>
                     <p className="mt-2 text-sm text-muted">
-                        Manage activities, safari experiences and packages.
+                        Manage activities and safari experiences.
                     </p>
+                    {isDemoMode && (
+                        <p className="mt-2 text-xs text-amber-700">
+                            Demo Mode — showing sample activities.
+                        </p>
+                    )}
                 </div>
 
-                {isAdmin && (
+                {isAdmin && !isDemoMode && (
                     <Button onClick={openAddDrawer}>
                         <Plus size={18} />
                         Add Activity
@@ -197,7 +271,6 @@ export default function ActivitiesPage() {
                 )}
             </div>
 
-            {/* Summary cards */}
             <div className="grid gap-4 sm:grid-cols-3">
                 <Card className="p-5">
                     <div className="flex items-center justify-between">
@@ -230,26 +303,25 @@ export default function ActivitiesPage() {
                 </Card>
             </div>
 
-            {/* Activity list */}
             <Card className="overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line p-5">
                     <div>
                         <h2 className="font-bold text-ink">All activities</h2>
                         <p className="mt-1 text-sm text-muted">
-                            View and manage available experiences.
+                            View available experiences.
                         </p>
                     </div>
 
                     <button
                         onClick={loadActivities}
-                        className="rounded-lg border border-line p-2 text-muted hover:bg-surface"
+                        disabled={loading}
+                        className="rounded-lg border border-line p-2 text-muted hover:bg-surface disabled:opacity-50"
                         title="Refresh activities"
                     >
                         <RefreshCw size={18} />
                     </button>
                 </div>
 
-                {/* Search and filters */}
                 <div className="flex flex-col gap-3 border-b border-line p-5 md:flex-row">
                     <div className="relative flex-1">
                         <Search
@@ -304,7 +376,11 @@ export default function ActivitiesPage() {
                                             {activity.name}
                                         </h3>
                                         <Badge
-                                            status={activity.isActive ? "ACTIVE" : "DEACTIVATED"}
+                                            status={
+                                                activity.isActive
+                                                    ? "ACTIVE"
+                                                    : "DEACTIVATED"
+                                            }
                                         />
                                     </div>
 
@@ -316,7 +392,9 @@ export default function ActivitiesPage() {
                                         <span>{activity.category}</span>
                                         <span className="flex items-center gap-1">
                                             <IndianRupee size={15} />
-                                            {Number(activity.pricePerPerson).toLocaleString("en-LK")}
+                                            {Number(
+                                                activity.pricePerPerson
+                                            ).toLocaleString("en-LK")}
                                             {" "}per person
                                         </span>
                                         <span className="flex items-center gap-1">
@@ -326,7 +404,7 @@ export default function ActivitiesPage() {
                                     </div>
                                 </div>
 
-                                {isAdmin && (
+                                {isAdmin && !isDemoMode && (
                                     <Button
                                         variant="outline"
                                         onClick={() => openEditDrawer(activity)}
@@ -341,11 +419,14 @@ export default function ActivitiesPage() {
                 )}
             </Card>
 
-            {/* Add / Edit drawer */}
             <Drawer
                 open={drawerOpen}
                 onClose={() => setDrawerOpen(false)}
-                title={editingId !== null ? "Edit activity" : "Add new activity"}
+                title={
+                    editingId !== null
+                        ? "Edit activity"
+                        : "Add new activity"
+                }
                 footer={
                     <>
                         <Button
@@ -356,10 +437,18 @@ export default function ActivitiesPage() {
                             Cancel
                         </Button>
                         <Button
-                            onClick={() => document.getElementById("activity-form")?.requestSubmit()}
+                            onClick={() =>
+                                document
+                                    .getElementById("activity-form")
+                                    ?.requestSubmit()
+                            }
                             disabled={saving}
                         >
-                            {saving ? "Saving..." : editingId !== null ? "Save changes" : "Save activity"}
+                            {saving
+                                ? "Saving..."
+                                : editingId !== null
+                                    ? "Save changes"
+                                    : "Save activity"}
                         </Button>
                     </>
                 }
@@ -395,8 +484,9 @@ export default function ActivitiesPage() {
                             className="h-11 w-full rounded-xl border border-line bg-white px-3 outline-none focus:border-brand"
                         >
                             <option value="Safari">Safari</option>
-                            <option value="Outdoor activity">Outdoor activity</option>
-                            <option value="Package">Package</option>
+                            <option value="Outdoor activity">
+                                Outdoor activity
+                            </option>
                         </select>
                     </div>
 
