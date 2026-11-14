@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { NAV } from "@/components/staff/nav";
 
+export const instant = false;
+
 // Placeholder for every menu page that has not been built yet.
 // When someone builds a real page (for example src/app/staff/(shell)/reservations/page.js),
 // it automatically takes priority over this file.
