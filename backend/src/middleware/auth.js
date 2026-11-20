@@ -36,4 +36,29 @@ const requireRole =
 
 const requireAdmin = requireRole("ADMIN");
 
-module.exports = { authenticate, requireRole, requireAdmin };
+// For guest routes: the token must be a guest token, and the guest must still be checked in
+const authenticateGuest = asyncHandler(async (req, _res, next) => {
+    const [scheme, token] = (req.headers.authorization || "").split(" ");
+    if (scheme !== "Bearer" || !token) throw new HttpError(401, "Please log in", "UNAUTHENTICATED");
+
+    let payload;
+    try {
+        payload = verifyToken(token);
+    } catch {
+        throw new HttpError(401, "Your session is invalid or has expired", "INVALID_TOKEN");
+    }
+    if (payload.type !== "guest") throw new HttpError(401, "Your session is invalid", "INVALID_TOKEN");
+
+    const reservation = await prisma.reservation.findUnique({
+        where: { id: payload.reservationId },
+        include: { package: true },
+        omit: { portalPasswordHash: true },
+    });
+    // Checked on every request, so a guest is locked out the moment they check out
+    if (!reservation || !reservation.portalActive) throw new HttpError(401, "Your stay has ended", "STAY_ENDED");
+
+    req.reservation = reservation;
+    next();
+});
+
+module.exports = { authenticate, authenticateGuest, requireRole, requireAdmin };

@@ -5,7 +5,7 @@ const HttpError = require("../utils/httpError");
 const asyncHandler = require("../utils/asyncHandler");
 const validate = require("../middleware/validate");
 const { authenticate } = require("../middleware/auth");
-const { staffLogin } = require("../services/authService");
+const { staffLogin, guestLogin } = require("../services/authService");
 const { hashPassword, verifyPassword } = require("../services/passwords");
 const { publicUser } = require("../services/userView");
 
@@ -14,6 +14,10 @@ const router = express.Router();
 
 const loginSchema = z.object({
     username: z.string().trim().min(1, "required"),
+    password: z.string().min(1, "required"),
+});
+const guestLoginSchema = z.object({
+    reference: z.string().trim().min(1, "required"),
     password: z.string().min(1, "required"),
 });
 
@@ -30,6 +34,11 @@ router.post(
         res.json(await staffLogin(req.body.username, req.body.password));
     })
 );
+// POST /api/auth/guest/login
+router.post("/guest/login", validate(guestLoginSchema), asyncHandler(async (req, res) => {
+    res.json(await guestLogin(req.body.reference, req.body.password));
+}));
+
 // GET /api/auth/me
 router.get("/me", authenticate, (req, res) => {
     res.json({ user: publicUser(req.user) });
