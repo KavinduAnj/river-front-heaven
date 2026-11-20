@@ -22,6 +22,8 @@ app.use("/api/blockedPeriods", require("./routes/blockedPeriods"));
 app.use("/api/billing", require("./routes/billing"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/reports", require("./routes/reports"));
+app.use("/api", require("./routes/menu"));
+app.use("/api", require("./routes/fnbOrders"));
 
 // 404 handler — keep this after all API routes
 app.use((_req, res) => {
