@@ -8,8 +8,16 @@ function signStaffToken(user) {
     });
 }
 
+// A guest token says which stay it belongs to. It is also checked against the stay on every request.
+function signGuestToken(reservation) {
+    return jwt.sign({ type: "guest", reservationId: reservation.id }, config.jwtSecret, {
+        algorithm: "HS256",
+        expiresIn: "12h",
+    });
+}
+
 function verifyToken(token) {
     return jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"] });
 }
 
-module.exports = { signStaffToken, verifyToken };
+module.exports = { signStaffToken, signGuestToken, verifyToken };
