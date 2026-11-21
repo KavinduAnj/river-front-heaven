@@ -113,8 +113,33 @@ router.post("/", staff, validate(createSchema), asyncHandler(async (req, res) =>
   res.status(201).json(reservation);
 }));
 
+// Lookup by reference e.g. RFH-0261
+router.get("/ref/:reference", staff, asyncHandler(async (req, res) => {
+  const reference = String(req.params.reference || "").trim().toUpperCase();
+  const r = await prisma.reservation.findUnique({
+    where: { reference },
+    ...show,
+  });
+  if (!r) throw new HttpError(404, "Reservation not found", "NOT_FOUND");
+  res.json(r);
+}));
+
 router.get("/:id", staff, asyncHandler(async (req, res) => {
   res.json(await find(parseId(req.params.id)));
+}));
+
+// Associate or switch guest on a reservation
+const linkGuestSchema = z.object({ guestId: z.number().int().positive() });
+router.patch("/:id/guest", staff, validate(linkGuestSchema), asyncHandler(async (req, res) => {
+  const r = await find(parseId(req.params.id));
+  const guest = await prisma.guest.findUnique({ where: { id: req.body.guestId } });
+  if (!guest) throw new HttpError(404, "Guest not found", "NOT_FOUND");
+  const updated = await prisma.reservation.update({
+    where: { id: r.id },
+    data: { guestId: guest.id },
+    ...show,
+  });
+  res.json(updated);
 }));
 
 // Edit: send the whole booking form again. It is checked exactly like a new booking.
