@@ -27,6 +27,7 @@ app.use("/api/reports", require("./routes/reports"));
 app.use("/api", require("./routes/menu"));
 app.use("/api", require("./routes/fnbOrders"));
 app.use("/api/guest", require("./routes/guest"));
+app.use("/api", require("./routes/bar"));
 
 // 404 handler — keep this after all API routes
 app.use((_req, res) => {
