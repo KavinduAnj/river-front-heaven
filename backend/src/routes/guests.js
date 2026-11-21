@@ -21,10 +21,16 @@ const createSchema = z.object(guestFields);
 const updateSchema = z.object(guestFields).omit({ idNumber: true }).partial()
     .refine((v) => Object.keys(v).length > 0, "send at least one field to change");
 
-// Register a guest. If the ID number is already known, the existing guest is returned.
+// Register a guest. If the ID number is already known, update details with incoming data.
 router.post("/", validate(createSchema), asyncHandler(async (req, res) => {
     const existing = await prisma.guest.findUnique({ where: { idNumber: req.body.idNumber } });
-    if (existing) return res.json(existing);
+    if (existing) {
+        const updated = await prisma.guest.update({
+            where: { id: existing.id },
+            data: req.body,
+        });
+        return res.json(updated);
+    }
     res.status(201).json(await prisma.guest.create({ data: req.body }));
 }));
 
